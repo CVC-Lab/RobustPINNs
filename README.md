@@ -5,7 +5,7 @@ Physics-informed Neural Networks (PINNs) have been shown to be effective in solv
 This repository implements the experiments in the paper:
 Chandrajit Bajaj, Luke McLennan, Timothy Andeen, Avik Roy. Robust physics-informed neural networks. 2021.
 
-[webpage link](https://cvc-lab.github.io/cvc-website/projects/robust-pinns/)
+The webpage for this project can be found [here.](https://cvc-lab.github.io/cvc-website/projects/robust-pinns/)
 
 ## Schrödinger Equation Experiments
 
