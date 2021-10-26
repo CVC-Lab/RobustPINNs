@@ -67,14 +67,16 @@ def MeshGrid(LBs, UBs, Nf):
       UBs = torch.tensor(UBs).cpu()
     else:
       UBs = UBs.cpu()
-    n = round(Nf**0.5)*2
+    n = round(Nf**0.5)
     #print(n)
-    XGrid, TGrid = np.meshgrid(np.arange(LBs[0], UBs[0], (UBs[0] - LBs[0])/n), 
-                              np.arange(LBs[1], UBs[1], (UBs[1] - LBs[1])/n))
-    XTGrid = np.append(XGrid.reshape(1,-1), TGrid.reshape(1,-1), axis = 0).T
-    xt_grid_indices = np.random.choice(XTGrid.shape[0], Nf, replace=False)
-    xt_f = torch.tensor(XTGrid[xt_grid_indices], dtype = torch.float32, requires_grad=True)
-    return xt_f
+    XGrid, TGrid = np.meshgrid(np.arange(LBs[0], UBs[0]+0.001, (UBs[0] - LBs[0])/(n-1)), 
+                               np.arange(LBs[1], UBs[1]+0.001, (UBs[1] - LBs[1])/(n-1)))
+    #XTGrid = np.append(XGrid.reshape(1,-1), TGrid.reshape(1,-1), axis = 0).T
+    #xt_grid_indices = np.random.choice(XTGrid.shape[0], Nf, replace=False)
+    #xt_f = torch.tensor(XTGrid[xt_grid_indices], dtype = torch.float32, requires_grad=True)
+    return XGrid, TGrid
+
+
 
 def SewingBoundary(x_value, LB, UB, Ni):
     x = torch.tensor([])
@@ -88,7 +90,7 @@ def SewingBoundary(x_value, LB, UB, Ni):
       UB = UB.cpu()
     TGrid = np.arange(LB, UB, (UB - LB)/(Ni*10))
     boundary_indices = np.random.choice(TGrid.shape[0], Ni, replace = False)
-    XTGrid = np.append(x_value.cpu()*np.ones((1, TGrid.shape[0])), TGrid.reshape(1,-1), axis = 0).T
+    XTGrid = np.append(x_value.cpu()*torch.tensor(np.ones((1, TGrid.shape[0]))), TGrid.reshape(1,-1), axis = 0).T
     return torch.tensor(XTGrid[boundary_indices], dtype = torch.float32, requires_grad=True)
 
 class PINN(nn.Module):
@@ -160,7 +162,6 @@ class PINN(nn.Module):
         IP_U_indices = list(range(n0))
 
         u_kernel = GP_U.kernel_.get_params()["k1__k2"]
-        
         for i in range(n0+1, self.N0pool): #200
             x = np.array([X[i].tolist()])
             K_U = u_kernel.__call__(x, X[IP_U_indices])
@@ -169,11 +170,8 @@ class PINN(nn.Module):
                 u_selections = u_selections + 1
 
         GP_U = GP_U.fit(X[IP_U_indices], u0[IP_U_indices])
-
         U0 = torch.tensor(GP_U.predict(X), dtype = torch.float32).reshape(-1)
-
-        print("IPs for u:", len(IP_U_indices))
-        
+        print("IPs for u:", len(IP_U_indices))        
         return U0, GP_U, u_selections, IP_U_indices
         
     
@@ -206,16 +204,16 @@ class PINN(nn.Module):
     def PhysicsLoss(self, XTGrid):
         XTGrid = XTGrid.to(self.device)
         uf = self.forward(XTGrid)[:,0]
-        uf_t = torch.autograd.grad(outputs=uf.to(self.device), 
+        uf_x, uf_t = torch.autograd.grad(outputs=uf.to(self.device), 
                                    inputs=XTGrid, 
                                    grad_outputs=torch.ones(uf.shape).to(self.device), 
                                    create_graph = True,
-                                   allow_unused=True)[0][:,1]
-        uf_x = torch.autograd.grad(outputs=uf.to(self.device), 
-                                   inputs=XTGrid, 
-                                   grad_outputs=torch.ones(uf.shape).to(self.device),
-                                   create_graph = True,
-                                   allow_unused=True)[0][:,0]
+                                   allow_unused=True)[0].T
+#         uf_x = torch.autograd.grad(outputs=uf.to(self.device), 
+#                                    inputs=XTGrid, 
+#                                    grad_outputs=torch.ones(uf.shape).to(self.device),
+#                                    create_graph = True,
+#                                    allow_unused=True)[0][:,0]
         uf_xx = torch.autograd.grad(outputs=uf_x.to(self.device), 
                                    inputs=XTGrid, 
                                    grad_outputs=torch.ones(uf_x.shape).to(self.device),
@@ -225,12 +223,54 @@ class PINN(nn.Module):
     
         return lossf
 
+#     def ColeHopfLoss(self, XT, shape):
+#         XT = XT.to(self.device)
+#         U = self.forward(XT)[:,0]
+#         dx = float(XT[1,0].detach() - XT[0,0].detach())
+#         #F = torch.zeros(U.shape[0], dtype = torch.float32, requires_grad=False, device=self.device)
+#         #for ii in range(U.shape[0]):
+#         #    F[ii] = F[ii] + torch.sum(U[(XT[:,1] == XT[ii,1]) * (XT[:,0] <= XT[ii,0])])*2*(2./100.)
+#         F = dx*torch.cumsum(U.reshape(shape), dim=1).reshape(-1)/(2*alpha)
+#         F = torch.clamp(F, min=-10, max=10000)
+#         V = torch.exp(-F)
+#         V = V.to(self.device)
+#         #print(F[0:10], V[0:10])
+#         u_x, u_t = torch.autograd.grad(outputs=U.to(self.device), 
+#                                    inputs=XT, 
+#                                    grad_outputs=torch.ones(U.shape).to(self.device), 
+#                                    create_graph = True,
+#                                    allow_unused=True)[0].T
+#         Ut = dx*torch.cumsum(u_t.reshape(shape), dim=1).reshape(-1)
+        
+#         lossf = torch.sum((V*(alpha*u_x - U**2/2 - Ut))**2)
+# #         v_t = torch.autograd.grad(outputs=V.to(self.device), 
+# #                                    inputs=XT, 
+# #                                    grad_outputs=torch.ones(V.shape).to(self.device), 
+# #                                    create_graph = True,
+# #                                    allow_unused=True)[0][:,1]
+# #         v_x = torch.autograd.grad(outputs=V.to(self.device), 
+# #                                    inputs=XT, 
+# #                                    grad_outputs=torch.ones(V.shape).to(self.device),
+# #                                    create_graph = True,
+# #                                    allow_unused=True)[0][:,0]
+# #         v_xx = torch.autograd.grad(outputs=v_x.to(self.device), 
+# #                                    inputs=XT, 
+# #                                    grad_outputs=torch.ones(v_x.shape).to(self.device),
+# #                                    create_graph = True,
+# #                                    allow_unused=True)[0][:,0]
+# #         #print(v_t[0:10])
+#         #print(v_x[0:10])
+#         #print(v_xx[0:10])
+#         #lossf =  self.Loss(alpha*v_xx, v_t)
+
+#         return lossf
+
 class cPINN:
     def __init__(self, boundaries, t_domain, Layers, N0, Nb, Nf, Ni, Nt, #optimizer,
                  InError = 0., Activation = nn.Tanh(),
                  model_name = "cPINN.model", device = 'cpu',
                  do_smoothing = False, N0pool = 0, N01 = 1000,
-                 threshold = 0.9, display_freq = 100):
+                 threshold = 0.9, display_freq = 100, do_colehopf=False):
         self.boundaries = torch.tensor(boundaries).to(device)
         self.tLow  = t_domain[0]
         self.tHigh = t_domain[1]
@@ -255,6 +295,7 @@ class cPINN:
         #print("SPINN = ", self.device)
         self.Loss = torch.nn.MSELoss(reduction='mean')
         self.PINNs = self.build_model(boundaries, Layers, N0, Nb, Nf, Nt)
+        self.do_colehopf = do_colehopf
         
     def build_model(self, boundaries, Layers, N0, Nb, Nf, Nt):
         list_PINNs = []
@@ -272,8 +313,8 @@ class cPINN:
     
     def BoundaryLoss(self):
         XTbL, XTbU = BoundaryCondition(self.Nb, self.boundaries[0], self.boundaries[-1])
-        ub_l, ub_u = self.PINNs[0].forward(XTbL), self.PINNs[-1].forward(XTbU)
-        return torch.mean(ub_l**2 + ub_u**2) 
+        ub_l, ub_u = self.PINNs[0].forward(XTbL).to(self.device), self.PINNs[-1].forward(XTbU).to(self.device)
+        return torch.mean(ub_l**2 + ub_u**2)
     
     
     def InterfaceLoss(self):
@@ -282,9 +323,9 @@ class cPINN:
             return loss
         else:
             for ii in range(len(self.boundaries)-2):
-                XTI = SewingBoundary(self.boundaries[ii+1], self.tLow, self.tHigh, self.Ni)
-                ui_0 = self.PINNs[ii].forward(XTI)
-                ui_1 = self.PINNs[ii+1].forward(XTI)
+                XTI = SewingBoundary(self.boundaries[ii+1], self.tLow, self.tHigh, self.Ni).to(self.device)
+                ui_0 = self.PINNs[ii].forward(XTI).to(self.device)
+                ui_1 = self.PINNs[ii+1].forward(XTI).to(self.device)
                 
                 ui0_x = torch.autograd.grad(outputs=ui_0.to(self.device), 
                                             inputs=XTI, 
@@ -310,6 +351,47 @@ class cPINN:
             to_return[indices] += this_uv
         return to_return
             
+    def ColeHopfLoss(self, XT, shape):
+        XT = XT.to(self.device)
+        U = self.Eval(XT)[:,0]
+        dx = float(XT[1,0].detach() - XT[0,0].detach())
+        #F = torch.zeros(U.shape[0], dtype = torch.float32, requires_grad=False, device=self.device)
+        #for ii in range(U.shape[0]):
+        #    F[ii] = F[ii] + torch.sum(U[(XT[:,1] == XT[ii,1]) * (XT[:,0] <= XT[ii,0])])*2*(2./100.)
+        F = dx*torch.cumsum(U.reshape(shape), dim=1).reshape(-1)/(2*alpha)
+        F = torch.clamp(F, min=-10, max=10000)
+        V = torch.exp(-F)
+        V = V.to(self.device)
+        #print(F[0:10], V[0:10])
+        u_x, u_t = torch.autograd.grad(outputs=U.to(self.device), 
+                                   inputs=XT, 
+                                   grad_outputs=torch.ones(U.shape).to(self.device), 
+                                   create_graph = True,
+                                   allow_unused=True)[0].T
+        Ut = dx*torch.cumsum(u_t.reshape(shape), dim=1).reshape(-1)
+        
+        lossf = torch.sum((V*(alpha*u_x - U**2/2 - Ut))**2)
+#         v_t = torch.autograd.grad(outputs=V.to(self.device), 
+#                                    inputs=XT, 
+#                                    grad_outputs=torch.ones(V.shape).to(self.device), 
+#                                    create_graph = True,
+#                                    allow_unused=True)[0][:,1]
+#         v_x = torch.autograd.grad(outputs=V.to(self.device), 
+#                                    inputs=XT, 
+#                                    grad_outputs=torch.ones(V.shape).to(self.device),
+#                                    create_graph = True,
+#                                    allow_unused=True)[0][:,0]
+#         v_xx = torch.autograd.grad(outputs=v_x.to(self.device), 
+#                                    inputs=XT, 
+#                                    grad_outputs=torch.ones(v_x.shape).to(self.device),
+#                                    create_graph = True,
+#                                    allow_unused=True)[0][:,0]
+#         #print(v_t[0:10])
+        #print(v_x[0:10])
+        #print(v_xx[0:10])
+        #lossf =  self.Loss(alpha*v_xx, v_t)
+
+        return lossf
         
     
     def Train(self, n_iters, weights=(1.0,1.0,1.0,1.0)):
@@ -328,15 +410,25 @@ class cPINN:
             Total_PhysicsLoss = torch.tensor(0.0, dtype = torch.float32, device=self.device, requires_grad = True)
             for ii in range(len(self.boundaries) - 1):
                 LBs, UBs = [self.boundaries[ii], self.tLow], [self.boundaries[ii + 1], self.tHigh]
-                XTGrid = MeshGrid(LBs, UBs, self.Nf)
+                XGrid, TGrid = MeshGrid(LBs, UBs, self.Nf)
+                XTGrid = torch.tensor(np.append(XGrid.reshape(1,-1), TGrid.reshape(1,-1), axis = 0).T, dtype = torch.float32, device=self.device, requires_grad=True)
                 Total_ICLoss = Total_ICLoss + self.PINNs[ii].ICLoss()
-                #Total_BCLoss = Total_BCLoss + self.PINNs[ii].BCLoss() 
                 Total_PhysicsLoss = Total_PhysicsLoss + self.PINNs[ii].PhysicsLoss(XTGrid)
+                #Total_BCLoss = Total_BCLoss + self.PINNs[ii].BCLoss() 
+            if self.do_colehopf:
+                LBs, UBs = [self.boundaries[0], self.tLow], [self.boundaries[-1], self.tHigh]
+                XGrid, TGrid = MeshGrid(LBs, UBs, self.Nf*len(self.PINNs))
+                XTGrid = torch.tensor(np.append(XGrid.reshape(1,-1), TGrid.reshape(1,-1), axis = 0).T, dtype = torch.float32, device=self.device, requires_grad=True)
+                Total_CHLoss = self.ColeHopfLoss(XTGrid, XGrid.shape).to(self.device)
+            else:
+                Total_CHLoss = torch.tensor(0.0, dtype = torch.float32, device=self.device, requires_grad = True)
             #Total_ICLoss = self.PINNs[0].ICLoss()
             Total_BCLoss = self.BoundaryLoss()
             InterfaceLoss = self.InterfaceLoss()
+            #print(Total_ICLoss.device, Total_BCLoss.device, Total_PhysicsLoss.device, Total_CHLoss.device, InterfaceLoss.device)
             Total_Loss = weights[0]*Total_ICLoss + weights[1]*Total_BCLoss\
-                        + weights[2]*Total_PhysicsLoss + weights[3]*InterfaceLoss
+                        + weights[2]*Total_PhysicsLoss + weights[3]*InterfaceLoss + 1.0*Total_CHLoss
+            #print(Total_Loss.device)
             optimizer.zero_grad()
             Total_Loss.backward()
             optimizer.step()
@@ -360,13 +452,14 @@ class cPINN:
                 print("\tIC Loss = {}".format(float(Total_ICLoss)))
                 print("\tBC Loss = {}".format(float(Total_BCLoss)))
                 print("\tPhysics Loss = {}".format(float(Total_PhysicsLoss)))
+                print("\tCH Loss = {}".format(float(Total_CHLoss)))
                 print("\tInterface Loss = {}".format(float(InterfaceLoss)))
                 print("\tTraining Loss = {}".format(float(Total_Loss)))
                 print("\tTest Loss = {}".format(float(Test_Loss)))
         return Training_Losses, Test_Losses
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
         parser = argparse.ArgumentParser()
         parser.add_argument('--domains', type=int, default=1, help='The number of domains when using a cPINN')
         parser.add_argument('--layers', type=int, default=4, help='The number of hidden layers in the neural network')
@@ -379,6 +472,8 @@ if __name__ == '__main__':
         parser.add_argument('--smooth', dest='smooth', action='store_true', help='Do SGP/GP smoothing')
         parser.add_argument('--no-smooth', dest='smooth', action='store_false', help='Do not do SGP/GP smoothing')
         parser.add_argument('--N0pool', type=int, default=50, help='The pool of points to select inducing points from for SGP')
+        parser.add_argument('--threshold', type=float, default=1.0, help='The threshold for selecting inducing points for SGP')
+        parser.add_argument('--do-colehopf', dest='do_colehopf', action='store_true', help='Do Cole-Hopf transform constrain')
 
 
         args = parser.parse_args()
@@ -410,4 +505,5 @@ if __name__ == '__main__':
                       do_smoothing = args.smooth,
                       N0pool = N0pool,
                       threshold = args.threshold,
+                      do_colehopf = args.do_colehopf,
                       display_freq = args.display_freq )
