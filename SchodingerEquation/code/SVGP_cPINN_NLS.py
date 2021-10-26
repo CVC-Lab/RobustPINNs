@@ -16,7 +16,7 @@ from sklearn.gaussian_process.kernels import RBF, WhiteKernel
 import numpy as np
 from scipy import io
 
-data = io.loadmat("NLS.mat")
+data = io.loadmat("../dataset/NLS.mat")
 t = torch.tensor(data['tt'], dtype = torch.float16).reshape(-1)
 x = torch.tensor(data['x'], dtype = torch.float16).reshape(-1)
 Exact = data['uu']
@@ -527,7 +527,7 @@ if __name__ == '__main__':
                       InError = args.error,
                       Activation = Activation,
                       device = device,
-                      model_name = args.model_name + ".model",
+                      model_name = "../models/" + args.model_name + ".model",
                       do_smoothing = args.smooth,
                       N0pool = N0pool,
                       threshold = args.threshold,
@@ -535,4 +535,4 @@ if __name__ == '__main__':
 
         Losses = cpinn.Train(args.epochs)
 
-        torch.save(Losses, args.model_name + ".data")
+        torch.save(Losses, "../models/" + args.model_name + ".data")
