@@ -28,8 +28,8 @@ This repository implements the experiments in the paper "Robust Physics Informed
 <img src = "Images/Burgers_SGP_PINN.gif" width = 200></img>
 
 ## References
-[1] Chandrajit Bajaj, Luke McLennan, Timothy Andeen, Avik Roy. Robust Physics-informed neural networks. 2021.
+[1] Chandrajit Bajaj, Luke McLennan, Timothy Andeen, Avik Roy. Robust physics-informed neural networks. 2021.
 
-[2] Maziar Raissi, Paris Perdikaris, and George E Karniadakis. Physics-informed neural networks: A deep learning framework for solving forward and inverse problems involving nonlinear partial differential equations.Journal of Computational Physics, 378:686–707, 2019.
+[2] Maziar Raissi, Paris Perdikaris, and George E Karniadakis. Physics-informed neural networks: A deep learning framework for solving forward and inverse problems involving nonlinear partial differential equations. Journal of Computational Physics, 378:686–707, 2019.
 
 [3] Ameya D Jagtap, Ehsan Kharazmi, and George Em Karniadakis. Conservative physics-informed neural networks on discrete domains for conservation laws: Applications to forward and inverse problems. Computer Methods in Applied Mechanics and Engineering, 365:113028, 2020.
