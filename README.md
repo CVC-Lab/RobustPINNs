@@ -23,9 +23,9 @@ This repository implements the experiments in the paper "Robust Physics Informed
 ## Burgers Equation Experiments
 
 ### Standard PINN with corrupted initial data
-<img src = "Images/Burgers_Standard_PINN.gif" width = 200></img>
+<img src = "Images/Standard_PINN_Burgers.gif" width = 200></img>
 ### PINN with sparse Gaussian Process smoothing
-<img src = "Images/Burgers_SGP_PINN.gif" width = 200></img>
+<img src = "Images/SGP_PINN_Burgers.gif" width = 200></img>
 
 ## References
 [1] Chandrajit Bajaj, Luke McLennan, Timothy Andeen, Avik Roy. Robust physics-informed neural networks. 2021.
