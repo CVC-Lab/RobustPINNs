@@ -19,7 +19,7 @@ import time
 import matplotlib.pyplot as plt
 start_time = time.time()
 
-data = io.loadmat("NLS.mat")
+data = io.loadmat("dataset/NLS.mat")
 t = torch.tensor(data['tt'], dtype = torch.float32).reshape(-1)
 x = torch.tensor(data['x'], dtype = torch.float32).reshape(-1)
 Exact = data['uu']
