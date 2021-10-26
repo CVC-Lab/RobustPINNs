@@ -495,7 +495,7 @@ if __name__ == '__main__':
         parser.add_argument('--smooth', dest='smooth', action='store_true', help='Do SGP/GP smoothing')
         parser.add_argument('--no-smooth', dest='smooth', action='store_false', help='Do not do SGP/GP smoothing')
         parser.add_argument('--N0pool', type=int, default=50, help='The pool of points to select inducing points from for SGP')
-        parser.add_argument('--threshold', type=float, default=0.995, help='The threshold for choosing inducing point for SGP')
+        parser.add_argument('--threshold', type=float, default=1.0, help='The threshold for choosing inducing point for SGP') #use 0.995 for SGP
         parser.add_argument('--epochs', type=int, default=50000, help='The number of epochs to train the neural network')
         parser.add_argument('--display-freq', type=int, default=1000, help='How often to display loss information')
         parser.add_argument('--model-name', type=string, default='PINN_model', help='File name to save the model')
