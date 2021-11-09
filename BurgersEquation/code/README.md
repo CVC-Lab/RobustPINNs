@@ -20,7 +20,7 @@ The script `PINN.py` can be used to run the solver for Burgers' equation for a v
 |**`--do-colehopf`**| Perform Cole-Hopf transformation constraint|
 
 To run the code: </br>
-`cd code`
+`cd code` </br>
 `mkdir -p ../models` </br>
 `python PINN.py <options>`
 
