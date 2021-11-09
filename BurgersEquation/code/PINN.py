@@ -9,7 +9,7 @@ from scipy import io
 import matplotlib.pyplot as plt
 import argparse
 
-data = io.loadmat('burgers_shock.mat')
+data = io.loadmat('../data/burgers_shock.mat')
 t = torch.tensor(data['t'], dtype = torch.float32) 
 x = torch.tensor(data['x'], dtype = torch.float32) 
 Exact_u = torch.tensor(data['usol'], dtype = torch.float32) 
