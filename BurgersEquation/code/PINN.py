@@ -415,3 +415,7 @@ if __name__ == "__main__":
                       threshold = args.threshold,
                       do_colehopf = args.do_colehopf,
                       display_freq = args.display_freq )
+
+        Losses = cpinn.Train(args.epochs)
+
+        torch.save(Losses, "../models/" + args.model_name + ".data")
