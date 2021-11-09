@@ -24,4 +24,4 @@ To run the code:</br>
 `mkdir -p ../models`</br>
 `python PINN.py <options>`</br>
 
-For running with full Gaussian process smoothing, the values for `N0` and `N0pool` should be set to equal values, same as the number of points considered on the initial time slice. For a sparse GP, choose `N0pool < N0`. When using `cPINNs`, the options `layers` and `nodes` represent the number of hidden layers and the number of nodels per hidder layer for individual MLPs in each of the subdomains.
+For running with full Gaussian process smoothing, the values for `N0` and `N0pool` should be set to equal values, same as the number of points considered on the initial time slice. For a sparse GP, choose `N0pool > N0`. When using `cPINNs`, the options `layers` and `nodes` represent the number of hidden layers and the number of nodels per hidder layer for individual MLPs in each of the subdomains.
