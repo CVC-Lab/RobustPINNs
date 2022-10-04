@@ -18,6 +18,10 @@ The script `PINN.py` can be used to run the solver for Burgers' equation for a v
 |**`--display-freq`**|  How often to display loss information|
 |**`--model-name`**| File name to save the model|
 |**`--do-colehopf`**| Perform Cole-Hopf transformation constraint|
+|**`--regularize`**| Do regularization|
+|**`--regmode`**| Mode of PINN regularization: L1 or L2| 
+|**`--regparam`**| The hyperparameter for regularization|
+
 
 To run the code: </br>
 `cd code` </br>
