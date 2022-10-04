@@ -18,6 +18,10 @@ The script `PINN.py` can be used to run the solver for Schrodinger equation for 
 |**`--epochs`**|       The number of epochs to train the neural network|
 |**`--display-freq`**| How often to display loss information|
 |**`--model-name`**|   File name to save the model|
+|**`--regularize`**| Do regularization|
+|**`--regmode`**| Mode of PINN regularization: L1 or L2| 
+|**`--regparam`**| The hyperparameter for regularization|
+
 
 To run the code:</br>
 `cd code`</br>

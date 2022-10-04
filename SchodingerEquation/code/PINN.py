@@ -7,6 +7,8 @@ from sklearn.gaussian_process.kernels import RBF, WhiteKernel
 import numpy as np
 from scipy import io
 import argparse
+import os
+import pickle
 
 data = io.loadmat("../dataset/NLS.mat")
 t = torch.tensor(data['tt'], dtype = torch.float32).reshape(-1)
@@ -271,7 +273,8 @@ class cPINN:
                  InError = 0., Activation = nn.Tanh(),
                  model_name = "cPINN.model", device = 'cpu',
                  do_smoothing = False, do_consLaw = False, N0pool = 0,
-                 threshold = 0.9, display_freq = 100):
+                 threshold = 0.9, display_freq = 100,
+                 do_regularize = False, regmode = 'L2', regparam = 1.e-4):
         self.boundaries = torch.tensor(boundaries).to(device)
         self.tLow  = t_domain[0]
         self.tHigh = t_domain[1]
@@ -288,7 +291,9 @@ class cPINN:
         self.threshold = threshold
         self.do_smoothing = do_smoothing
         self.do_consLaw = do_consLaw
-        #self.optimizer = optimizer
+        self.do_regularize = do_regularize
+        self.regmode = regmode
+        self.regparam = regparam
         self.InError = InError
         self.Activation = Activation
         self.device = device
@@ -309,7 +314,16 @@ class cPINN:
         for pinn in self.PINNs:
             list_params += list(pinn.parameters())
         return list_params
-    
+
+    def regLoss(self):
+        loss = torch.tensor(0.0, dtype = torch.float32, device=self.device, requires_grad = True)
+        list_params = self.parameters()
+        for param in list_params:
+            if self.regmode == 'L1':
+                loss = loss + param.abs().sum()
+            elif self.regmode == 'L2':
+                loss = loss + (param**2).sum()
+        return loss
     
     def BoundaryLoss(self):
         XTbL, XTbU = BoundaryCondition(self.Nb, self.boundaries[0], self.boundaries[-1], self.device)
@@ -416,6 +430,9 @@ class cPINN:
             InterfaceLoss = self.InterfaceLoss()
             Total_Loss = weights[0]*Total_ICLoss + weights[1]*Total_BCLoss\
                        + weights[2]*Total_PhysicsLoss + weights[3]*InterfaceLoss
+            if self.do_regularize:
+                RegLoss =  self.regparam * self.regLoss()
+                Total_Loss = Total_Loss + RegLoss
             optimizer.zero_grad()
             Total_Loss.backward()
             optimizer.step()
@@ -444,6 +461,8 @@ class cPINN:
                 print("\tBC Loss = {}".format(float(Total_BCLoss)))
                 print("\tPhysics Loss = {}".format(float(Total_PhysicsLoss)))
                 print("\tInterface Loss = {}".format(float(InterfaceLoss)))
+                if self.do_regularize:
+                    print("\tRegularization Loss = {}".format(float(RegLoss)))
                 print("\tTraining Loss = {}".format(float(Total_Loss)))
                 print("\tTest Loss = {}".format(float(Test_Loss)))
         return Training_Losses, Test_Losses
@@ -467,9 +486,16 @@ if __name__ == '__main__':
         parser.add_argument('--epochs', type=int, default=50000, help='The number of epochs to train the neural network')
         parser.add_argument('--display-freq', type=int, default=1000, help='How often to display loss information')
         parser.add_argument('--model-name', type=str, default='PINN_model', help='File name to save the model')
+        parser.add_argument('--regularize', default=False, action='store_true', help='Do regularization')
+        parser.add_argument('--regmode', type=str, default='L2', help='Mode of PINN regularization: L1 or L2')
+        parser.add_argument('--regparam', type=float, default=1.e-4, help='The hyperparameter for regularization')
+        
 
 
         args = parser.parse_args()
+        
+        if not os.path.exists("../models/"):
+            os.mkdir("../models/")
 
         device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         NDomains = args.domains
@@ -500,8 +526,13 @@ if __name__ == '__main__':
                       do_consLaw = args.consLaw,
                       N0pool = N0pool,
                       threshold = args.threshold,
-                      display_freq = args.display_freq)
+                      display_freq = args.display_freq,
+                      do_regularize = args.regularize,
+                      regmode = args.regmode,
+                      regparam = args.regparam)
 
         Losses = cpinn.Train(args.epochs)
-
+        
+        
+            
         torch.save(Losses, "../models/" + args.model_name + ".data")
