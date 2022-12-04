@@ -15,7 +15,6 @@ if not os.path.exists(SAVE_PATH):
     os.mkdir(SAVE_PATH)
 
 
-
 class timer:
     def __init__(self):
         self.cur = time.time()
@@ -240,39 +239,50 @@ class PINN(nn.Module):
 if __name__ == "__main__":
 
     parser = argparse.ArgumentParser()
-    parser.add_argument("--mode", type = int, default = 0, help = "0: no error, 1: error but no smoothing, 2: GP-smoothing, 3: SVGP-smoothing")
+    parser.add_argument("--mode", type = int, default = 0, help = "0: no error, 1: error but no smoothing, 2: GP-smoothing, 3: SGP-smoothing")
     parser.add_argument("--epochs", type = int, default = 20000, help = "Number of epochs/iterations")
+    parser.add_argument("--layers", type = int, default = 4, help = "Number of hidden layers")
+    parser.add_argument("--nodes", type = int, default = 256, help = "Number of nodes per hidden layer")
+    parser.add_argument("--N0", type = int, default = 1024, help = "Number of points on initial timeslice")
+    parser.add_argument("--Nb", type = int, default = 256, help = "Number of points for boundary condition")
+    parser.add_argument("--Nf", type = int, default = 50000, help = "Number of collocation points for enforcing physics")
+    parser.add_argument("--Nt", type = int, default = 50000, help = "Number of points to evaluate test MSE")
+    parser.add_argument("--N01", type = int, default = 512, help = "Initial selection of Inducing points for SGP")
+    parser.add_argument("--M", type = int, default = 768, help = "Maximum allowed inducing points for SGP")
+    parser.add_argument("--in-error", type = float, default = 0.0, help = "Error-size")
     parser.add_argument("--display-freq", type = int, default = 400, help = "How often to display errors (once per x epochs)")
     parser.add_argument("--model-name", type = str, default = "" , help = "model name")
     args = parser.parse_args()
 
+    N0pool = args.N0
+    InError = args.in_error
+    if args.mode > 0 and InError == 0.0:
+        print("Zero error not acceptable for these modes! Adding error-size of 1.0")
+        InError = 1.0
+
     if args.mode == 0:
-        N0 = 1024
+        N0 = N0pool
         InError = 0.
         do_smoothing = False
-        N01 = 1024
-        N0pool = 1024
+        N01 = N0pool
         model_name = "PINN_Heat_2d_no_error" + ("_" + args.model_name.strip('_') if args.model_name else "")
     elif args.mode == 1:
-        N0 = 1024
+        N0 = N0pool
         InError = 1.0
         do_smoothing = False
-        N01 = 1024
-        N0pool = 1024
+        N01 = N0pool
         model_name = "PINN_Heat_2d_no_smoothing" + ("_" + args.model_name.strip('_') if args.model_name else "")
     elif args.mode == 2:
-        N0 = 1024
+        N0 = N0pool
         InError = 1.0
         do_smoothing = True
-        N01 = 1024
-        N0pool = 1024
+        N01 = N0pool
         model_name = "PINN_Heat_2d_GP" + ("_" + args.model_name.strip('_') if args.model_name else "")
     elif args.mode == 3:
-        N0 = 768
+        N0 = args.M
         InError = 1.0
         do_smoothing = True
-        N01 = 512
-        N0pool = 1024
+        N01 = args.N01
         model_name = "PINN_Heat_2d_SGP" + ("_" + args.model_name.strip('_') if args.model_name else "")
 
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -288,13 +298,16 @@ if __name__ == "__main__":
     Exact_U = exact_soln(XYT)
 
 
-    Layers = [3, 256, 256, 256, 256, 1]
+    Layers = [3] + args.layers*[args.nodes] + [1]
     Activation = nn.Tanh()
 
     pinn = PINN(LBs = LBs,
                 UBs = UBs,
                 Layers = Layers,
                 InError = InError,
+                Nb = args.Nb,
+                Nf = args.Nf,
+                Nt = args.Nt,
                 N0 = N0,
                 N0pool = N0pool,
                 N01 = N01,
