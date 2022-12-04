@@ -36,44 +36,6 @@ def exact_soln(XYT):
     return torch.cat((u, v), 1)
 
 
-# def exact_soln(XYT):
-#     x, y, t = XYT[:,0], XYT[:,1], XYT[:,2]
-
-#     def A(m,n):
-#         if n == 0 and m == 0:
-#             return 1
-#         if n == 0 and m != 0:
-#             return 2
-#         if n !=0 and m == 0:
-#             return 2
-#         if n != 0 and m != 0:
-#             return 4
-
-#     def C(m,n):
-#         if (n + m)%2 != 0:
-#             return 0
-#         else:
-#             v = iv(int((m+n)/2), lmbda) * iv(int((m-n)/2), lmbda)
-#             # print(m,n,v)
-#             return v
-        
-#     num_u = torch.zeros(XYT.shape[0]).float()
-#     num_v = torch.zeros(XYT.shape[0]).float()
-#     den = torch.zeros(XYT.shape[0]).float()    
-
-#     for n in range(0, 500):
-#         for m in range(0,500):
-#             if (n+m)%2 == 1:
-#                 continue
-#             num_u += n * A(m,n) * C(n,m) * torch.exp(-(n**2 + m**2)* np.pi**2 * mu * t) * torch.sin(n*np.pi*x) * torch.cos(m*np.pi*y)
-#             num_v += m * A(m,n) * C(n,m) * torch.exp(-(n**2 + m**2)* np.pi**2 * mu * t) * torch.cos(n*np.pi*x) * torch.sin(m*np.pi*y)
-#             den   +=     A(m,n) * C(n,m) * torch.exp(-(n**2 + m**2)* np.pi**2 * mu * t) * torch.cos(n*np.pi*x) * torch.cos(m*np.pi*y)
-#     num_u = num_u.reshape(-1,1)
-#     num_v = num_v.reshape(-1,1)
-#     den = den.reshape(-1,1)
-
-#     return 2*np.pi*mu*torch.cat((num_u/den, num_v/den), 1)
-
 def stacked_grid(x,y,t):
     X, Y, T = torch.meshgrid(x, y, t)
     return torch.hstack((X.flatten()[:, None], Y.flatten()[:, None], T.flatten()[:,None])).float()
@@ -323,39 +285,47 @@ class PINN(nn.Module):
 if __name__ == "__main__":
 
     parser = argparse.ArgumentParser()
-    parser.add_argument("--mode", type = int, default = 0, help = "0: no error, 1: error but no smoothing, 2: GP-smoothing, 3: SVGP-smoothing")
+
+    parser.add_argument("--mode", type = int, default = 0, help = "0: no error, 1: error but no smoothing, 2: GP-smoothing, 3: SGP-smoothing")
     parser.add_argument("--epochs", type = int, default = 20000, help = "Number of epochs/iterations")
+    parser.add_argument("--layers", type = int, default = 4, help = "Number of hidden layers")
+    parser.add_argument("--nodes", type = int, default = 256, help = "Number of nodes per hidden layer")
+    parser.add_argument("--N0", type = int, default = 1024, help = "Number of points on initial timeslice")
+    parser.add_argument("--Nb", type = int, default = 256, help = "Number of points for boundary condition")
+    parser.add_argument("--Nf", type = int, default = 50000, help = "Number of collocation points for enforcing physics")
+    parser.add_argument("--Nt", type = int, default = 50000, help = "Number of points to evaluate test MSE")
+    parser.add_argument("--N01", type = int, default = 512, help = "Initial selection of Inducing points for SGP")
+    parser.add_argument("--M", type = int, default = 768, help = "Maximum allowed inducing points for SGP")
+    parser.add_argument("--in-error", type = float, default = 0.0, help = "Error-size")
     parser.add_argument("--display-freq", type = int, default = 400, help = "How often to display errors (once per x epochs)")
     parser.add_argument("--model-name", type = str, default = "" , help = "model name")
+
     args = parser.parse_args()
+    N0pool = args.N0
+    InError = args.in_error
+    if args.mode > 0 and InError == 0.0:
+        print("Zero error not acceptable for these modes! Adding error-size of 0.5")
+        InError = 0.5
 
     if args.mode == 0:
-        N0 = 1024
-        InError = 0.
+        N0 = N0pool
         do_smoothing = False
-        N01 = 1024
-        N0pool = 1024
+        N01 = N0pool
         model_name = "PINN_Burgers_2d_no_error" + ("_" + args.model_name.strip('_') if args.model_name else "")
     elif args.mode == 1:
-        N0 = 1024
-        InError = 0.5
+        N0 = N0pool
         do_smoothing = False
-        N01 = 1024
-        N0pool = 1024
+        N01 = N0pool
         model_name = "PINN_Burgers_2d_no_smoothing" + ("_" + args.model_name.strip('_') if args.model_name else "")
     elif args.mode == 2:
-        N0 = 1024
-        InError = 0.5
+        N0 = N0pool
         do_smoothing = True
-        N01 = 1024
-        N0pool = 1024
+        N01 = N0pool
         model_name = "PINN_Burgers_2d_GP" + ("_" + args.model_name.strip('_') if args.model_name else "")
     elif args.mode == 3:
-        N0 = 768
-        InError = 0.5
+        N0 = args.M
         do_smoothing = True
-        N01 = 512
-        N0pool = 1024
+        N01 = args.N01
         model_name = "PINN_Burgers_2d_SGP" + ("_" + args.model_name.strip('_') if args.model_name else "")
 
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -377,7 +347,7 @@ if __name__ == "__main__":
     # print(Exact_U)
 
 
-    Layers = [3, 256, 256, 256, 256, 2]
+    Layers = [3] +  args.layers*[args.nodes]+ [2]
     Activation = nn.Tanh()
 
     pinn = PINN(LBs = LBs,
@@ -387,6 +357,9 @@ if __name__ == "__main__":
                 N0 = N0,
                 N0pool = N0pool,
                 N01 = N01,
+                Nb = args.Nb,
+                Nf = args.Nf,
+                Nt = args.Nt,
                 Activation = Activation,
                 device = device,
                 model_name = model_name,

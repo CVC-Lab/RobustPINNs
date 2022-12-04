@@ -262,25 +262,21 @@ if __name__ == "__main__":
 
     if args.mode == 0:
         N0 = N0pool
-        InError = 0.
         do_smoothing = False
         N01 = N0pool
         model_name = "PINN_Heat_2d_no_error" + ("_" + args.model_name.strip('_') if args.model_name else "")
     elif args.mode == 1:
         N0 = N0pool
-        InError = 1.0
         do_smoothing = False
         N01 = N0pool
         model_name = "PINN_Heat_2d_no_smoothing" + ("_" + args.model_name.strip('_') if args.model_name else "")
     elif args.mode == 2:
         N0 = N0pool
-        InError = 1.0
         do_smoothing = True
         N01 = N0pool
         model_name = "PINN_Heat_2d_GP" + ("_" + args.model_name.strip('_') if args.model_name else "")
     elif args.mode == 3:
         N0 = args.M
-        InError = 1.0
         do_smoothing = True
         N01 = args.N01
         model_name = "PINN_Heat_2d_SGP" + ("_" + args.model_name.strip('_') if args.model_name else "")
