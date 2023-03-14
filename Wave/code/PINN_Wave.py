@@ -504,7 +504,7 @@ if __name__ == '__main__':
         if not os.path.exists("../models/"):
             os.mkdir("../models/")
 
-        device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+        device = torch.device('cuda:1' if torch.cuda.is_available() else 'cpu')
         NDomains = args.domains
         NHiddenLayers = args.layers
         ##LBs = [0.0, 0.0]
